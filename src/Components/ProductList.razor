@@ -1,0 +1,351 @@
+@using ContosoCrafts.WebSite.Models
+@using ContosoCrafts.WebSite.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject JsonFileProductService ProductService
+
+<div class="row">
+    <div class="col-md-4">
+        <input type="text" placeholder="Search" id="searchText" @bind="@inputValue" @oninput="@((e) => { inputValue=(string)e.Value;})" />
+        <button @onclick="(e => saveSearchString(inputValue))" class="btn btn-green btn-success" id="search">
+            Search
+        </button>
+    </div>
+
+    <div class="col-md-2">
+        <label class="filterLabel">Filter</label>
+        <select id="filter" @bind="@selectedString">
+            <option value="">All</option>
+            <option value="Star">Star</option>
+            <option value="Planet">Planet</option>
+            <option value="Planetary Satellite">Planetary Satellite</option>
+        </select>
+    </div>
+    <div class="col-md-6">
+        <div class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-grey btn-secondary" @onclick="(e => sortOrder = 1)">
+                <input type="radio" id="sortAlphabetically" />
+                Sort Alphabetically
+            </label>
+            <label class="btn btn-grey btn-secondary" @onclick="(e => sortOrder = 2)">
+                <input type="radio" id="sortReverseAlphabetically" />
+                Sort Reverse Alphabetically
+            </label>
+            <label class="btn btn-grey btn-secondary" @onclick="(e => sortOrder = 0)">
+                <input type="radio" id="sortByDistance" checked />
+                Sort By Distance from Sun
+            </label>
+        </div>
+    </div>
+</div>
+
+<br />
+
+<div class="row hidden-md-up">
+    @foreach (var product in Sort(ProductService.GetAllData()))
+    {
+        @if (objectSearch(product))
+        {
+            @if (objectFilter(product))
+            {
+                <div class="col-md-4 planet-card">
+                    <div class="card">
+                        <!--setting the image in a card-->
+                        <div class="flip-card">
+                            <div class="flip-card-inner">
+                                <img class="card-img-top flip-card-front" src="@product.Image" style="width:345px;height:365px;">
+                                <div class="card-img-top flip-card-back" style="width:345px;height:365px;">
+                                    <p>@product.Description</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!--setting the title in a card -->
+                            <h5 class="card-title">@product.Title</h5>
+                        </div>
+                        <div class="card-footer">
+                            <small class="text-muted">
+                                <!--handling the button More Info onclick-->
+                                <button @onclick="(e => SelectProduct(product.Id))" id="moreInfo_@product.Id"
+                            data-toggle="modal" data-target="#productModal" class="btn btn-yellow btn-warning">
+                                    More Info
+                                </button>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    }
+</div>
+
+@if (selectedProduct == null)
+{
+    selectedProduct = Sort(ProductService.GetAllData()).First();
+}
+
+<div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="productTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <!--setting the selected product title in a top of popup-->
+                <h5 class="modal-title" id="productTitle">@selectedProduct.Title</h5>
+                <!--setting the close button icon on top-->
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="card">
+                    <!--setting the selected product image in middle of the card-->
+                    <div class="card-img" style="background-image: url('@selectedProduct.Image');">
+                    </div>
+                    <!--setting the selected product Description After Image-->
+                    <div class="card-body">
+                        <p class="card-text">@selectedProduct.Description</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <!--setting the selected product url button which will redirect to the another website for More information.-->
+                <span><a class="btn btn-blue btn-info" href="@selectedProduct.Url" role="button" target="_blank">Learn More</a></span>
+            </div>
+            <div class="modal-footer">
+                <!--Setting the rating functionality for selected product on the footer of the card.-->
+                @if (voteCount == 0)
+                {
+                    <span>Be the first to vote!</span>
+                }
+                @if (voteCount >= 1)
+                {
+                    <span>@voteCount @voteLabel</span>
+                }
+                @for (int i = 1; i < 6; i++)
+                {
+                    var currentStar = i;
+                    if (i <= currentRating)
+                    {
+                        <span class="fa fa-star checked" @onclick="(e => SubmitRating(currentStar))"></span>
+                    }
+                    if (i > currentRating)
+                    {
+                        <span class="fa fa-star" @onclick="(e => SubmitRating(currentStar))"></span>
+                    }
+                }
+            </div>
+            <div class="row">
+                <div class="col">
+                    @{
+                        // This shall show all the pre-existing comments
+                        foreach (var comment in selectedProduct.CommentList)
+                        {
+                            <div class="row">
+                                <div class="col">
+                                    @comment.Comment
+                                </div>
+                            </div>
+                        }
+
+                        // This shall show the input box for new comment
+                        if (NewComment)
+                        {
+                            <div class="row">
+                                <div class="col">
+                                    <input type="text" id="newComment" @onchange="(e) => UpdateCommentText(e.Value.ToString())" value="" />
+                                    <button @onclick="(e => AddComment())" class="btn btn-green btn-success" data-toggle="modal" id="keepComment">Keep</button>
+                                </div>
+                            </div>
+                        }
+
+                        // This shall show the button for Adding comment
+                        if (NewComment == false)
+                        {
+                            <div class="row">
+                                <div class="col">
+                                    <button @onclick="(e => ShowNewCommentInput())" id="AddComment" class="btn btn-black btn-dark">Comment</button>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+
+@code
+{
+    //Store the selected product information and id
+    public ProductModel selectedProduct;
+    public string selectedProductId;
+
+    //initialize new search bar parameter
+    public string inputValue { get; set; } = "";
+    public string searchString { get; set; } = "";
+
+    //initialize filter parameter
+    string selectedString = "";
+
+    // Store the order to sort items by
+    int sortOrder { get; set; } = 0;
+
+    /// <summary>
+    /// retrieve voting assigned variables from selected object's id
+    /// </summary>
+    /// <param name="productId"></param>
+    public void SelectProduct(string productId)
+    {
+        selectedProductId = productId;
+        selectedProduct = ProductService.GetAllData().First(x => x.Id == productId);
+        GetCurrentRating();
+    }
+
+    /// <summary>
+    /// retrieve search string value from the search bar input label.
+    /// </summary>
+    /// <param name="stringToSave"></param>
+    public void saveSearchString(string stringToSave)
+    {
+        searchString = stringToSave;
+    }
+
+    /// <summary>
+    /// For each object, check if the search string matches any of them.
+    /// If searchString is blank, then we ignore it.
+    /// </summary>
+    /// <param name="obj"></param>
+    bool objectSearch(ProductModel obj)
+    {
+        if (searchString == "")
+        {
+            return true;
+        }
+        if (obj.Title.ToLower().Contains(searchString.ToLower()))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// For each object, if a filter is selected, check if each obj product type matches the filter.
+    /// If filter is blank, then we ignore it.
+    /// </summary>
+    /// <param name="obj"></param>
+    public bool objectFilter(ProductModel obj)
+    {
+        if (selectedString == "")
+        {
+            return true;
+        }
+        if (obj.ProductType.GetName() == selectedString)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    //initialize new voting params
+    public int currentRating = 0;
+    public int voteCount = 0;
+    public string voteLabel;
+
+    /// <summary>
+    /// GETS voting data if present
+    /// if not, then returns default values
+    /// </summary>
+    public void GetCurrentRating()
+    {
+        if (selectedProduct.Ratings != null)
+        {
+            voteCount = selectedProduct.Ratings.Count();
+            voteLabel = voteCount > 1 ? "Votes" : "Vote";
+            currentRating = selectedProduct.Ratings.Sum() / voteCount;
+        }
+        //System.Console.WriteLine($"Current rating for {selectedProduct.Id}: {currentRating}");
+    }
+
+    /// <summary>
+    /// Recieves rating value from user
+    /// POSTS selected rating value by user per ID user selected
+    /// </summary>
+    /// <param name="rating"></param>
+    public void SubmitRating(int rating)
+    {
+        //GET rating for ID from user
+        //System.Console.WriteLine($"Rating received for {selectedProduct.Id}: {rating}");
+        //POST rating for ID from user
+        ProductService.AddRating(selectedProductId, rating);
+        SelectProduct(selectedProductId);
+    }
+    // New Comment Flag to show the input box or not
+    public bool NewComment = false;
+
+    // Next Comment Text is what the comment text is
+    public string NewCommentText = "";
+
+    /// <summary>
+    /// Enable the New Comment Entry by setting the NewComment flag
+    /// </summary>
+    /// <param name="comment"></param>
+    void ShowNewCommentInput()
+    {
+        // Setting the new Comment flag to true will show the input box
+        NewComment = true;
+    }
+
+    /// <summary>
+    /// Set the New Comment Text variable to the data just entered in the input box
+    /// </summary>
+    void UpdateCommentText(string newCommentText)
+    {
+        NewCommentText = newCommentText;
+    }
+
+    /// <summary>
+    /// Add the comment to the product
+    /// Best to refactor this to be a method to call in the Middle Tier Data service, rathern than putting the logic here...
+    /// </summary>
+    /// <param name="comment"></param>
+    public void AddComment()
+    {
+        // Refactor to be a call to the middle tier
+        // ProductService.AddCommentToProduct(selectedProduct, comment);
+
+
+        // Add it to the Comment List
+        selectedProduct.CommentList.Add(new CommentModel() { Comment = NewCommentText });
+
+        // Call for the Product to be saved
+        ProductService.UpdateData(selectedProduct);
+
+        // Set the NewComment flag to false to hide the input box
+        NewComment = false;
+    }
+
+
+    /// <summary>
+    /// returns the productList in sorted order.
+    /// </summary>
+    /// <param name="productList"> The list to be sorted </param>
+    /// <param name="sortOrder">
+    /// sortOrder 0 (and default) is by distance from the sun
+    /// sortOrder 1 is alphabetical
+    /// sortOrder 2 is reverse alphabetical
+    /// </param>
+    /// <returns> The list in sorted order </returns>
+    IEnumerable<ProductModel> Sort(IEnumerable<ProductModel> productList)
+    {
+        switch (sortOrder)
+        {
+            case 1:
+                return productList.OrderBy(x => x.Title);
+            case 2:
+                return productList.OrderByDescending(x => x.Title);
+            default:
+                return productList.OrderBy(x => x.Distance).ThenBy(x => x.ProductType);
+        }
+    }
+}
